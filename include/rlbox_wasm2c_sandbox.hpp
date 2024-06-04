@@ -492,6 +492,7 @@ public:
     bool infallible = true,
     const w2c_mem_capacity* custom_capacity = nullptr)
   {
+    // printf("creaitng sandbox in inner yayy\n");
     FALLIBLE_DYNAMIC_CHECK(
       infallible, instance_initialized == false, "Sandbox already initialized");
 
@@ -552,6 +553,19 @@ public:
     instance_initialized = true;
 
     return true;
+  }
+
+  inline void impl_reset_sandbox() { 
+    // how do we reset the sandbox??
+    printf("wasm2c: resetting yayyyy\n"); 
+    // 1. clear malloced memory for the sandbox -> sandbox_memory_info
+    reset_wasm2c_memory(&sandbox_memory_info);
+
+    // 2. clear return values -> 'return slot'
+    
+
+    // 3. clear registers??
+    
   }
 
 #undef FALLIBLE_DYNAMIC_CHECK

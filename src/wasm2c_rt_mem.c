@@ -452,3 +452,26 @@ static int os_mmap_commit(void* addr, size_t size, int prot)
 #else
 #  error "Unknown OS"
 #endif
+
+void reset_wasm2c_memory(wasm_rt_memory_t* memory){
+  printf("wasm2c: wiping memory at %p\n", memory);
+
+  if (memory->data != 0) {
+    //           memsetting works with 0x110000 size of total, but anything more fails consistently
+    const uint64_t heap_reserve_size = 0x110000;
+    // compute_heap_reserve_space(memory->max_pages);
+    printf("\twasm2c: computed heap to be 0x%llx\n", compute_heap_reserve_space(memory->max_pages));
+
+    uint64_t page_size = (uint64_t)os_getpagesize();
+    uint64_t request_size = (heap_reserve_size + page_size - 1) & ~(page_size - 1);
+    printf("\tcalculated page size: 0x%llx and final req_size: 0x%llx\n",
+           page_size,
+           request_size);
+           
+    printf("\twasm2c: wiping memory at %p, size: 0x%llx\n", memory, heap_reserve_size);
+    memset(memory->data, 0x0, request_size);
+    printf("\twasm2c: memset that shit, now data: %llx\n", *(long long unsigned*)memory->data);
+    // os_munmap(memory->data, heap_reserve_size);
+    // memory->data = 0;
+  }
+}

@@ -38,6 +38,7 @@ extern "C"
     uint32_t initial_pages,
     const w2c_mem_capacity* custom_capacity);
   void destroy_wasm2c_memory(wasm_rt_memory_t* memory);
+  void reset_wasm2c_memory(wasm_rt_memory_t* memory);
 
 #ifdef __cplusplus
 }
