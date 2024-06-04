@@ -177,26 +177,22 @@ void destroy_wasm2c_memory(wasm_rt_memory_t* memory)
   }
 }
 
+FILE *fptr;
+
 void reset_wasm2c_memory(wasm_rt_memory_t* memory){
-
+  
   if (memory->data != 0) {
-    //           memsetting works with 0x110000 size of total, but anything more fails consistently
-    // TODO: why is it that specifically??
-    //    maybe you run into stack memory or smth that corrupts the operation
-    const uint64_t heap_reserve_size = 
-      // compute_heap_reserve_space(memory->max_pages);
-      0x110000;
-    printf("\twasm2c: computed heap to be 0x%llx\n", compute_heap_reserve_space(memory->max_pages));
-
-    uint64_t page_size = (uint64_t)os_getpagesize();
-    uint64_t request_size = (heap_reserve_size + page_size - 1) & ~(page_size - 1);
-    printf("\tcalculated page size: 0x%llx and final req_size: 0x%llx\n",
-           page_size,
-           request_size);
-           
-    printf("\twasm2c: wiping heap memory at %p, size: 0x%llx\n", memory, heap_reserve_size);
-    memset(memory->data, 0x0, request_size);
-    printf("\t\twasm2c: memset that shit, now data: %llx\n", *(long long unsigned*)memory->data);
+    // TODO: more fine-grained erasure?? -> protect constant global vars that would be preserved when re-making sandbox
+    const uint64_t mem_size = memory->size;
+    
+    // // dump memory if you want to see its contents
+    // fptr = fopen("memory_prewipe.txt", "w");
+    // fwrite(memory->data, mem_size, 1, fptr);
+    // fclose(fptr);
+    // printf("dumping succeeded\n");
+    
+    printf("\twasm2c: wiping heap memory at %p, size: 0x%llx\n", memory->data, mem_size);
+    memset(memory->data, 0x0, mem_size);
   }
 }
 

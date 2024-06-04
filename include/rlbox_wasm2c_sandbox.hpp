@@ -559,14 +559,8 @@ public:
 
   inline void impl_reset_sandbox() { 
     // 1. clear malloced memory for the sandbox -> sandbox_memory_info
-    // NOTE: this reset seems to fuck up printing in subsequent functions, even if no printing is used
-    //              i think bc it writes null bytes to the console addr? and it prints one null byte using up the print
-    //              don't think its an issue though bc we dont want there to be printing
-    //              and *functions should still work properly*
-    // FIXME: (probably intendend) but this clears both global vars and consts
-    //        with a new sandbox instance they would be re-set to intial values
-    //        what does this mean for developer effort??
-    //            could they just use macros instead?
+    // NOTE: the reset overwrites the console address so it counts as the one print allowed in the sandbox
+    //       this has to be the case though bc stdout could be used to leak the addr
     reset_wasm2c_memory(&sandbox_memory_info);
 
     // 2. clear return values -> 'return slot'
