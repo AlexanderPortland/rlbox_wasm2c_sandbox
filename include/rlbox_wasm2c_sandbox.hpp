@@ -22,6 +22,8 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <string.h>
+#include <stdio.h>
 
 #if defined(_WIN32)
 // Ensure the min/max macro in the header doesn't collide with functions in
@@ -556,15 +558,28 @@ public:
   }
 
   inline void impl_reset_sandbox() { 
-    // how do we reset the sandbox??
-    printf("wasm2c: resetting yayyyy\n"); 
     // 1. clear malloced memory for the sandbox -> sandbox_memory_info
+    // NOTE: this reset seems to fuck up printing in subsequent functions, even if no printing is used
+    //              i think bc it writes null bytes to the console addr? and it prints one null byte using up the print
+    //              don't think its an issue though bc we dont want there to be printing
+    //              and *functions should still work properly*
+    // FIXME: (probably intendend) but this clears both global vars and consts
+    //        with a new sandbox instance they would be re-set to intial values
+    //        what does this mean for developer effort??
+    //            could they just use macros instead?
     reset_wasm2c_memory(&sandbox_memory_info);
 
     // 2. clear return values -> 'return slot'
-    
+    if (return_slot_size) {
+      // TODO: this never seems to be taken for some reason
+      // TODO: does this ptr need to be swizzled? am i misunderstanding what the return slot is??
+      printf("\twasm2c: clearing return slot of size 0x%zx, at %x\n", return_slot_size, return_slot); 
+      std::memset((void*)return_slot, 0x0, return_slot_size);
+    } else {
+      printf("\twasm2c: no return slot\n"); 
+    }
 
-    // 3. clear registers??
+    // TODO: what else is stored as sandbox state
     
   }
 
@@ -842,6 +857,15 @@ public:
   }
 
   inline void impl_free_in_sandbox(T_PointerType p)
+  {
+    using T_Func = void(void*);
+    using T_Converted = void(T_PointerType);
+    impl_invoke_with_func_ptr<T_Func, T_Converted>(
+      reinterpret_cast<T_Converted*>(RLBOX_WASM_MODULE_TYPE_CURR::free_address),
+      p);
+  }
+
+  inline void impl_memset_in_sandbox(T_PointerType p)
   {
     using T_Func = void(void*);
     using T_Converted = void(T_PointerType);
