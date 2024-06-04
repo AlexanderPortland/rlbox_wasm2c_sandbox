@@ -313,7 +313,7 @@ private:
   mutable wasm_rt_funcref_table_t sandbox_callback_table;
   uintptr_t heap_base;
   size_t return_slot_size = 0;
-  T_PointerType return_slot = 0;
+  T_PointerType return_slot = 0;    // for storing which function to return too when using fn pointers
   mutable std::vector<T_PointerType> callback_free_list;
 
   static const size_t MAX_CALLBACKS = 128;
@@ -322,7 +322,7 @@ private:
   void* callbacks[MAX_CALLBACKS]{ 0 };
   uint32_t callback_slot_assignment[MAX_CALLBACKS]{ 0 };
   mutable std::map<const void*, uint32_t> internal_callbacks;
-  mutable std::map<uint32_t, const void*> slot_assignments;
+  mutable std::map<uint32_t, const void*> slot_assignments; // TODO: what is this for?
 
 #ifndef RLBOX_EMBEDDER_PROVIDES_TLS_STATIC_VARIABLES
   thread_local static inline rlbox_wasm2c_sandbox_thread_data thread_data{ 0,
@@ -563,17 +563,15 @@ public:
     //       this has to be the case though bc stdout could be used to leak the addr
     reset_wasm2c_memory(&sandbox_memory_info);
 
-    // 2. clear return values -> 'return slot'
+    // 2. clear 'return slot' for fn callback
     if (return_slot_size) {
-      // TODO: this never seems to be taken for some reason
-      // TODO: does this ptr need to be swizzled? am i misunderstanding what the return slot is??
-      printf("\twasm2c: clearing return slot of size 0x%zx, at %x\n", return_slot_size, return_slot); 
+      // printf("\twasm2c: clearing return slot of size 0x%zx, at %x\n", return_slot_size, return_slot); 
       std::memset((void*)return_slot, 0x0, return_slot_size);
     } else {
-      printf("\twasm2c: no return slot\n"); 
+      // printf("\twasm2c: no return slot\n"); 
     }
 
-    // TODO: what else is stored as sandbox state
+    // FIXME: i think that's it for sandbox state, but make sure
     
   }
 
@@ -851,15 +849,6 @@ public:
   }
 
   inline void impl_free_in_sandbox(T_PointerType p)
-  {
-    using T_Func = void(void*);
-    using T_Converted = void(T_PointerType);
-    impl_invoke_with_func_ptr<T_Func, T_Converted>(
-      reinterpret_cast<T_Converted*>(RLBOX_WASM_MODULE_TYPE_CURR::free_address),
-      p);
-  }
-
-  inline void impl_memset_in_sandbox(T_PointerType p)
   {
     using T_Func = void(void*);
     using T_Converted = void(T_PointerType);
