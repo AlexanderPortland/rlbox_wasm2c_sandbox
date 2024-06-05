@@ -305,7 +305,7 @@ public:
   using T_ShortType = int16_t;
 
 private:
-  mutable typename RLBOX_WASM_MODULE_TYPE_CURR::instance_t wasm2c_instance{ 0 };
+  mutable typename RLBOX_WASM_MODULE_TYPE_CURR::instance_t wasm2c_instance{ 0 }; // this has all the metadata
   struct w2c_env sandbox_memory_env;
   struct w2c_wasi__snapshot__preview1 wasi_env;
   bool instance_initialized = false;
@@ -322,7 +322,7 @@ private:
   void* callbacks[MAX_CALLBACKS]{ 0 };
   uint32_t callback_slot_assignment[MAX_CALLBACKS]{ 0 };
   mutable std::map<const void*, uint32_t> internal_callbacks;
-  mutable std::map<uint32_t, const void*> slot_assignments; // TODO: what is this for?
+  mutable std::map<uint32_t, const void*> slot_assignments; // what is this for? i think function callbacks
 
 #ifndef RLBOX_EMBEDDER_PROVIDES_TLS_STATIC_VARIABLES
   thread_local static inline rlbox_wasm2c_sandbox_thread_data thread_data{ 0,
@@ -561,18 +561,73 @@ public:
     // 1. clear malloced memory for the sandbox -> sandbox_memory_info
     // NOTE: the reset overwrites the console address so it counts as the one print allowed in the sandbox
     //       this has to be the case though bc stdout could be used to leak the addr
-    reset_wasm2c_memory(&sandbox_memory_info);
+    dump_memory();
 
-    // 2. clear 'return slot' for fn callback
-    if (return_slot_size) {
-      // printf("\twasm2c: clearing return slot of size 0x%zx, at %x\n", return_slot_size, return_slot); 
-      std::memset((void*)return_slot, 0x0, return_slot_size);
-    } else {
-      // printf("\twasm2c: no return slot\n"); 
-    }
+    reset_wasm2c_memory(&sandbox_memory_info);
+    // TODO: we also need to make sure we modify sandbox memory metadata here
+    // so we aren't leaking memory
+
+    // 2. clear 'return slot' metadata for fn callback
+    return_slot_size = 0;
+    return_slot = 0;
+    // since the return_slot is malloced in sandbox memory, 
+    //                  we can clear it, but it's redundant
+    // if (return_slot_size) {
+    //   std::memset((void*)return_slot, 0x0, return_slot_size);
+    // }
+
+
+    // 3. FIXME: does the function callback table pose a privacy risk??
 
     // FIXME: i think that's it for sandbox state, but make sure
     
+  }
+
+  inline void dump_memory(){
+    FILE* fptr;
+    // first we dump wasm2c_instance state
+    fptr = fopen("instance_state.txt", "w");
+    fprintf(fptr, "w2c_g0: 0x%x\n", wasm2c_instance.w2c_g0);
+    fprintf(fptr, "w2c_SECRET_NUM: 0x%x\n", wasm2c_instance.w2c_SECRET_NUM);
+    fprintf(fptr, "w2c_CONST_SECRET_NUM2: 0x%x\n\n", wasm2c_instance.w2c_CONST_SECRET_NUM2);
+
+    fprintf(fptr, "w2c_0x5F_heap_base: 0x%x\n", wasm2c_instance.w2c_0x5F_heap_base);
+    fprintf(fptr, "w2c_0x5F_stdin_used: 0x%x\n", wasm2c_instance.w2c_0x5F_stdin_used);
+    fprintf(fptr, "w2c_0x5F_stderr_used: 0x%x\n", wasm2c_instance.w2c_0x5F_stderr_used);
+    fprintf(fptr, "w2c_0x5F_stdout_used: 0x%x\n", wasm2c_instance.w2c_0x5F_stdout_used);
+    fprintf(fptr, "w2c_stderr: 0x%x\n", wasm2c_instance.w2c_stderr);
+    fprintf(fptr, "w2c_stdout: 0x%x\n", wasm2c_instance.w2c_stdout);
+    fprintf(fptr, "w2c_0x5F_stderr_used: 0x%x\n\n", wasm2c_instance.w2c_0x5F_stderr_used);
+
+    fprintf(fptr, "w2c_errno: 0x%x\n", wasm2c_instance.w2c_errno);
+    fprintf(fptr, "w2c_0x5F_progname: 0x%x\n", wasm2c_instance.w2c_0x5F_progname);
+    fprintf(fptr, "w2c_0x5F_progname_full: 0x%x\n", wasm2c_instance.w2c_0x5F_progname_full);
+    fprintf(fptr, "w2c_program_invocation_short_name: 0x%x\n", wasm2c_instance.w2c_program_invocation_short_name);
+    fprintf(fptr, "w2c_program_invocation_name: 0x%x\n\n", wasm2c_instance.w2c_program_invocation_name);
+
+
+    fprintf(fptr, "w2c_0x5F_dso_handle: 0x%x\n", wasm2c_instance.w2c_0x5F_dso_handle);
+    fprintf(fptr, "w2c_0x5F_data_end: 0x%x\n", wasm2c_instance.w2c_0x5F_data_end);
+    fprintf(fptr, "w2c_0x5F_global_base: 0x%x\n", wasm2c_instance.w2c_0x5F_global_base);
+    fprintf(fptr, "w2c_0x5F_memory_base: 0x%x\n", wasm2c_instance.w2c_0x5F_memory_base);
+    fprintf(fptr, "w2c_0x5F_table_base: 0x%x\n\n", wasm2c_instance.w2c_0x5F_table_base);
+
+    fprintf(fptr, "w2c_0x5F_libc: 0x%x\n", wasm2c_instance.w2c_0x5F_libc);
+    fprintf(fptr, "w2c_0x5F_hwcap: 0x%x\n", wasm2c_instance.w2c_0x5F_hwcap);
+    fprintf(fptr, "w2c_0x5F_stdout_FILE: 0x%x\n", wasm2c_instance.w2c_0x5F_stdout_FILE);
+    fprintf(fptr, "w2c_0x5F_stderr_FILE: 0x%x\n", wasm2c_instance.w2c_0x5F_stderr_FILE);
+    fprintf(fptr, "w2c_0x5F_libc: 0x%x\n", wasm2c_instance.w2c_0x5F_libc);
+    fprintf(fptr, "w2c_0x5F_libc: 0x%x\n", wasm2c_instance.w2c_0x5F_libc);
+
+
+    fclose(fptr);
+    printf("dumping state succeeded\n");
+
+    // then we dump memory contents
+    fptr = fopen("memory_prewipe.txt", "w");
+    fwrite(sandbox_memory_info.data, sandbox_memory_info.size, 1, fptr);
+    fclose(fptr);
+    printf("dumping memory succeeded\n");
   }
 
 #undef FALLIBLE_DYNAMIC_CHECK

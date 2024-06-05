@@ -178,11 +178,13 @@ void destroy_wasm2c_memory(wasm_rt_memory_t* memory)
 }
 
 void reset_wasm2c_memory(wasm_rt_memory_t* memory){
-  
+
+  // TODO: more fine-grained erasure?? -> protect constant global vars that would be preserved when re-making sandbox
   if (memory->data != 0) {
-    // TODO: more fine-grained erasure?? -> protect constant global vars that would be preserved when re-making sandbox
-    const uint64_t mem_size = memory->size;
-    const size_t opt_offset = 0xff000; // TODO: programatically set this based on sandbox metadata
+    // const size_t opt_offset = 0xff000; // TODO: programatically set this based on sandbox metadata
+    const size_t opt_offset = 0xff000;
+    const uint64_t size_to_wipe = memory->size - opt_offset;
+    const uint64_t addr_to_wipe = memory->data + opt_offset;
 
     // // dump memory if you want to see its contents
     // fptr = fopen("memory_prewipe.txt", "w");
@@ -190,8 +192,8 @@ void reset_wasm2c_memory(wasm_rt_memory_t* memory){
     // fclose(fptr);
     // printf("dumping succeeded\n");
     
-    // printf("\twasm2c: wiping memory at %p, size: 0x%llx\n", memory->data + opt_offset, mem_size - opt_offset);
-    memset(memory->data + opt_offset, 0, mem_size - opt_offset);
+    printf("\twasm2c: wiping memory at %p, size: 0x%llx\n", addr_to_wipe, size_to_wipe);
+    memset(addr_to_wipe, 0, size_to_wipe);
   }
 }
 
