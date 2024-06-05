@@ -316,6 +316,9 @@ private:
   T_PointerType return_slot = 0;    // for storing which function to return too when using fn pointers
   mutable std::vector<T_PointerType> callback_free_list;
 
+  void* stashed_globals = 0;
+  size_t stashed_globals_size = 0;
+
   static const size_t MAX_CALLBACKS = 128;
   mutable RLBOX_SHARED_LOCK(callback_mutex);
   void* callback_unique_keys[MAX_CALLBACKS]{ 0 };
@@ -552,6 +555,14 @@ public:
                              "Sandbox heap not aligned to 4GB");
     }
 
+    // now we want to stash our globals
+    // from g_0?? -> w2c_0x5F_stdin_used + 8;
+
+    // printf("stashing\n");
+
+    // TODO: is this the right place to stash the globals?? (some things that later get initialized seem to be overwritten)
+    stash_globals();
+
     instance_initialized = true;
 
     return true;
@@ -561,9 +572,26 @@ public:
     // 1. clear malloced memory for the sandbox -> sandbox_memory_info
     // NOTE: the reset overwrites the console address so it counts as the one print allowed in the sandbox
     //       this has to be the case though bc stdout could be used to leak the addr
-    dump_memory();
 
+    dump_memory("state_pre.txt", "memory_pre.txt");
+
+    // 1. wipe all memory
     reset_wasm2c_memory(&sandbox_memory_info);
+
+    FILE* fptr;
+    // first we dump wasm2c_instance state
+    fptr = fopen("globals.txt", "w");
+    fwrite(stashed_globals, stashed_globals_size, 1, fptr);
+    fclose(fptr);
+
+    // 2. restore stashed globals
+    restore_stashed_globals();
+
+    dump_memory("state_post.txt", "memory_post.txt");
+
+    // 3. restore wasm instance state
+
+    // dump_memory("state_post.txt", "memory_post.txt");
     // TODO: we also need to make sure we modify sandbox memory metadata here
     // so we aren't leaking memory
 
@@ -583,10 +611,35 @@ public:
     
   }
 
-  inline void dump_memory(){
+  inline void stash_globals() {
+    // FIXME: this method makes it so that you can write one out every print
+    // TODO: why can you print to std error a crap ton? (probably things we fix here with the stashed globals)
+    stashed_globals_size = this->wasm2c_instance.w2c_0x5F_stdin_used + 8 
+                          - this->wasm2c_instance.w2c_g0;
+              
+    stashed_globals = malloc(stashed_globals_size);
+
+    if (stashed_globals != 0) {
+      uint8_t * stash_start =
+        this->sandbox_memory_info.data + this->wasm2c_instance.w2c_g0;
+      std::memcpy(stashed_globals, stash_start, stashed_globals_size);
+      // printf("memcpy successful, yayy\n");
+    } else {
+      printf("error mallocing globals stash\n");
+      stashed_globals_size = 0;
+    }
+  }
+
+  inline void restore_stashed_globals(){
+    uint8_t * stash_start =
+        this->sandbox_memory_info.data + this->wasm2c_instance.w2c_g0;
+    std::memcpy(stash_start, stashed_globals, stashed_globals_size);
+  }
+
+  inline void dump_memory(char* state, char* memory){
     FILE* fptr;
     // first we dump wasm2c_instance state
-    fptr = fopen("instance_state.txt", "w");
+    fptr = fopen(state, "w");
     fprintf(fptr, "w2c_g0: 0x%x\n", wasm2c_instance.w2c_g0);
     fprintf(fptr, "w2c_SECRET_NUM: 0x%x\n", wasm2c_instance.w2c_SECRET_NUM);
     fprintf(fptr, "w2c_CONST_SECRET_NUM2: 0x%x\n\n", wasm2c_instance.w2c_CONST_SECRET_NUM2);
@@ -621,13 +674,13 @@ public:
 
 
     fclose(fptr);
-    printf("dumping state succeeded\n");
+    // printf("dumping state succeeded (to %s)\n", state);
 
     // then we dump memory contents
-    fptr = fopen("memory_prewipe.txt", "w");
+    fptr = fopen(memory, "w");
     fwrite(sandbox_memory_info.data, sandbox_memory_info.size, 1, fptr);
     fclose(fptr);
-    printf("dumping memory succeeded\n");
+    // printf("dumping memory succeeded (to %s)\n", memory);
   }
 
 #undef FALLIBLE_DYNAMIC_CHECK
@@ -636,6 +689,11 @@ public:
   {
     if (return_slot_size) {
       impl_free_in_sandbox(return_slot);
+    }
+
+    if (stashed_globals_size){
+      // printf("freeing stashed globals");
+      free(stashed_globals);
     }
 
     if (instance_initialized) {
