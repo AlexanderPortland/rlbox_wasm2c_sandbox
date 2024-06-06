@@ -563,26 +563,25 @@ public:
     // TODO: is this the right place to stash the globals?? (some things that later get initialized seem to be overwritten)
     stash_globals();
 
+    dump_memory("state_start.txt", "memory_start.txt");
+
     instance_initialized = true;
 
     return true;
   }
 
   inline void impl_reset_sandbox() { 
-    // 1. clear malloced memory for the sandbox -> sandbox_memory_info
-    // NOTE: the reset overwrites the console address so it counts as the one print allowed in the sandbox
-    //       this has to be the case though bc stdout could be used to leak the addr
 
     dump_memory("state_pre.txt", "memory_pre.txt");
 
     // 1. wipe all memory
     reset_wasm2c_memory(&sandbox_memory_info);
 
-    FILE* fptr;
-    // first we dump wasm2c_instance state
-    fptr = fopen("globals.txt", "w");
-    fwrite(stashed_globals, stashed_globals_size, 1, fptr);
-    fclose(fptr);
+    // FILE* fptr;
+    // // first we dump wasm2c_instance state
+    // fptr = fopen("globals.txt", "w");
+    // fwrite(stashed_globals, stashed_globals_size, 1, fptr);
+    // fclose(fptr);
 
     // 2. restore stashed globals
     restore_stashed_globals();
@@ -591,32 +590,30 @@ public:
 
     // 3. restore wasm instance state
 
-    // dump_memory("state_post.txt", "memory_post.txt");
     // TODO: we also need to make sure we modify sandbox memory metadata here
-    // so we aren't leaking memory
+    // so we aren't leaking memory ^^
 
-    // 2. clear 'return slot' metadata for fn callback
+    // ?. clear 'return slot' metadata for fn callback
     return_slot_size = 0;
     return_slot = 0;
-    // since the return_slot is malloced in sandbox memory, 
-    //                  we can clear it, but it's redundant
-    // if (return_slot_size) {
-    //   std::memset((void*)return_slot, 0x0, return_slot_size);
-    // }
 
-
-    // 3. FIXME: does the function callback table pose a privacy risk??
+    // 4+. consider other sidechannels
 
     // FIXME: i think that's it for sandbox state, but make sure
     
   }
 
   inline void stash_globals() {
-    // FIXME: this method makes it so that you can write one out every print
     // TODO: why can you print to std error a crap ton? (probably things we fix here with the stashed globals)
-    stashed_globals_size = this->wasm2c_instance.w2c_0x5F_stdin_used + 8 
-                          - this->wasm2c_instance.w2c_g0;
-              
+    // Notes: 
+    // - you can print multiple times to stderr from within the sandbox and it does show up on screen
+    //
+
+    // FIXME: this method makes it so that you can write one out every print
+    stashed_globals_size = this->wasm2c_instance.w2c_0x5F_data_end  // end of the saved region
+                          - this->wasm2c_instance.w2c_g0;           // start of the saved region
+    // stashed_globals_size = 0xbc0;
+
     stashed_globals = malloc(stashed_globals_size);
 
     if (stashed_globals != 0) {
@@ -640,6 +637,7 @@ public:
     FILE* fptr;
     // first we dump wasm2c_instance state
     fptr = fopen(state, "w");
+    fprintf(fptr, "heap_base: 0x%x\n", heap_base);
     fprintf(fptr, "w2c_g0: 0x%x\n", wasm2c_instance.w2c_g0);
     fprintf(fptr, "w2c_SECRET_NUM: 0x%x\n", wasm2c_instance.w2c_SECRET_NUM);
     fprintf(fptr, "w2c_CONST_SECRET_NUM2: 0x%x\n\n", wasm2c_instance.w2c_CONST_SECRET_NUM2);
