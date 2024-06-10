@@ -482,9 +482,12 @@ u32 w2c_wasi__snapshot__preview1_fd_write(
   u32 iovcnt,
   u32 pnum)
 {
+  return WASI_BADF_ERROR;
   if (fd != WASM_STDOUT && fd != WASM_STDERR) {
     return WASI_BADF_ERROR;
   }
+
+  printf("miniwasi: trying to access fd %d\n", fd);
 
   u32 num = 0;
   for (u32 i = 0; i < iovcnt; i++) {

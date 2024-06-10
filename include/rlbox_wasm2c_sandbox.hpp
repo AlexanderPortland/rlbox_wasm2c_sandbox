@@ -584,7 +584,7 @@ public:
     fclose(fptr);
 
     // 2. restore stashed globals
-    // restore_stashed_globals();
+    restore_stashed_globals();
 
     dump_memory("dumps/state_post.txt", "dumps/memory_post.txt");
 
