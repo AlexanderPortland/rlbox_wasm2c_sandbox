@@ -630,6 +630,9 @@ public:
   inline void restore_stashed_globals(){
     uint8_t * stash_start =
         this->sandbox_memory_info.data + this->wasm2c_instance.w2c_g0;
+    printf("\twasm2c: restoring data segment from %p to %p\n",
+           stash_start,
+           stash_start + stashed_globals_size);
     std::memcpy(stash_start, stashed_globals, stashed_globals_size);
   }
 
@@ -637,7 +640,7 @@ public:
     FILE* fptr;
     // first we dump wasm2c_instance state
     fptr = fopen(state, "w");
-    fprintf(fptr, "heap_base: 0x%x\n", heap_base);
+    fprintf(fptr, "heap_base: %lu\n", heap_base);
     fprintf(fptr, "w2c_g0: 0x%x\n", wasm2c_instance.w2c_g0);
     fprintf(fptr, "w2c_SECRET_NUM: 0x%x\n", wasm2c_instance.w2c_SECRET_NUM);
     fprintf(fptr, "w2c_CONST_SECRET_NUM2: 0x%x\n\n", wasm2c_instance.w2c_CONST_SECRET_NUM2);
